@@ -1,18 +1,49 @@
-name: GitHub Actions Demo
-run-name: ${{ github.actor }} is testing out GitHub Actions 🚀
-on: [push]
+name: Build and publish a Docker image
+# REF https://docs.github.com/en/actions/publishing-packages/publishing-docker-images
+on:
+  push:
+    branches:
+      - '*'
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  pull_request:
+    branches:
+      - '*'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  IMG_NAME: ${{ github.repository }}
+
+
 jobs:
-  Explore-GitHub-Actions:
-runs-on: ubuntu-latest
-steps:
-  – run: echo “🎉 The job was automatically triggered by a ${{ github.event_name }} event.”
-  – run: echo “🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!”
-  – run: echo “🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}.”
-  – name: Check out repository code
-    uses: actions/checkout@v3
-  – run: echo “💡 The ${{ github.repository }} repository has been cloned to the runner.”
-  – run: echo “🖥️ The workflow is now ready to test your code on the runner.”
-  – name: List files in the repository
-    run: |
-      ls ${{ github.workspace }}
-  – run: echo “🍏 This job’s status is ${{ job.status }}.”
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
